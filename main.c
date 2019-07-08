@@ -111,6 +111,9 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
+#define NOTIFY_BUTTON                   BSP_BUTTON_0
+#define BUTTON_DETECTION_DELAY          APP_TIMER_TICKS(80)  
+
 BLE_HTS_DEF(m_hts);//ble_test_service
 /*
 static ble_hts_t m_hts; 
@@ -138,8 +141,8 @@ static sensorsim_state_t m_temp_celcius_sim_state;
 static ble_uuid_t m_adv_uuids[] =                                               /**< Universally unique service identifiers. */
 {
     //{BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE},
-    {BLE_UUID_HEALTH_THERMOMETER_SERVICE, BLE_UUID_TYPE_BLE}//ble_test_service
-    //{BLE_UUID128_USER_SERVICE_BASE_UUID,  BLE_UUID_TYPE_VENDOR_BEGIN}
+    //{BLE_UUID_HEALTH_THERMOMETER_SERVICE, BLE_UUID_TYPE_BLE}//ble_test_service
+    {BLE_UUID_USER_SERVICE_UUID,BLE_UUID_TYPE_VENDOR_BEGIN}//BLE_UUID_TYPE_VENDOR_BEGIN
 };
 
 
@@ -457,24 +460,6 @@ static void services_init(void)
     err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
     APP_ERROR_CHECK(err_code);
 
-    /*ble_hts_init_t hts_init;
-    memset(&hts_init, 0, sizeof(hts_init));
-
-    hts_init.evt_handler = NULL;
-    hts_init.temp_type_as_characteristic = TEMP_TYPE_AS_CHARACTERISTIC;
-    hts_init.temp_type                   = BLE_HTS_TEMP_TYPE_BODY;
-
-    // Here the sec level for the Health Thermometer Service can be changed/increased.
-    BLE_GAP_CONN_SEC_MODE_SET_ENC_NO_MITM(&hts_init.hts_meas_attr_md.cccd_write_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_meas_attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_meas_attr_md.write_perm);
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&hts_init.hts_temp_type_attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&hts_init.hts_temp_type_attr_md.write_perm);
-
-    err_code = ble_hts_init(&m_hts, &hts_init);
-    APP_ERROR_CHECK(err_code);*/
-
     ble_us_init_t us_init;
     memset(&us_init, 0, sizeof(us_init));
 
@@ -623,6 +608,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)//ble_
             NRF_LOG_INFO("Disconnected.");
             m_conn_handle               = BLE_CONN_HANDLE_INVALID;
             m_hts_meas_ind_conf_pending = false;//ble_test_service
+            NRF_LOG_INFO(" evtID:%x evtParams:%x\n",p_ble_evt->header.evt_id,\
+                          p_ble_evt->evt.gap_evt.params.disconnected.reason);
             // LED indication will be changed when advertising starts.
             break;
 
@@ -789,6 +776,7 @@ static void advertising_init(void)
 {
     ret_code_t             err_code;
     ble_advertising_init_t init;
+    ble_advdata_t srpdata;
 
     memset(&init, 0, sizeof(init));
 
@@ -842,6 +830,55 @@ static void buttons_leds_init(bool * p_erase_bonds)
     *p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
 }
 
+static void button_event_handler(uint8_t pin_no, uint8_t button_action)
+{
+    ret_code_t err_code;
+
+    switch (pin_no)
+    {
+        /*case NOTIFY_BUTTON:
+            NRF_LOG_INFO("Notify testchar value.");
+            err_code = ble_us_write_testchar_change(&m_us_c);
+            if (err_code != NRF_SUCCESS &&
+                err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                err_code != NRF_ERROR_INVALID_STATE &&
+                err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+            {
+                APP_ERROR_CHECK(err_code);
+            }
+            break;
+
+        case READTESTCHAR_BUTTON:
+            NRF_LOG_INFO("Read testchar value.");
+            err_code = ble_us_c_tcv_read(&m_us_c);
+            if (err_code != NRF_SUCCESS &&
+                err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                err_code != NRF_ERROR_INVALID_STATE &&
+                err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+            {
+                APP_ERROR_CHECK(err_code);
+            }
+            break;*/
+
+        default:
+            APP_ERROR_HANDLER(pin_no);
+            break;
+    }
+}
+static void buttons_init(void)
+{
+    ret_code_t err_code;
+
+    //The array must be static because a pointer to it will be saved in the button handler module.
+    static app_button_cfg_t buttons[] =
+    {
+        {NOTIFY_BUTTON, false, BUTTON_PULL, button_event_handler}
+    };
+
+    err_code = app_button_init(buttons, ARRAY_SIZE(buttons),
+                               BUTTON_DETECTION_DELAY);
+    APP_ERROR_CHECK(err_code);
+}
 
 /**@brief Function for initializing the nrf log module.
  */
@@ -905,15 +942,16 @@ int main(void)
     log_init();
     timers_init();
     buttons_leds_init(&erase_bonds);
+
     power_management_init();
-    ble_stack_init();
+    ble_stack_init();//ble_evt_handler
     gap_params_init();
     gatt_init();
     
     services_init();
     advertising_init();
     conn_params_init();
-    peer_manager_init();
+    peer_manager_init();//pm_evt_handler
 
     // Start execution.
     NRF_LOG_INFO("Template example started.");

@@ -165,7 +165,7 @@ ret_code_t ble_us_init(ble_us_t *p_us,ble_us_init_t *p_us_init)
     {
         return err_code;
     }
-    ble_uuid.type = p_us->uuid_type;
+    ble_uuid.type = p_us->uuid_type;//0x02
     ble_uuid.uuid = BLE_UUID_USER_SERVICE_UUID;
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
                                         &ble_uuid,
@@ -216,7 +216,7 @@ void us_gatts_handle_write(ble_us_t      * p_us,
     {
         case BLE_UUID_TEST_CHAR_UUID://0x26de
         {
-            if (length > 2)
+            if (length != 2)
             {
                 reply.params.write.gatt_status = BLE_GATT_STATUS_ATTERR_INVALID_ATT_VAL_LENGTH;
                 length = 0;
@@ -226,6 +226,7 @@ void us_gatts_handle_write(ble_us_t      * p_us,
                 //testCharVal=*p_data;
                 memcpy(&testCharVal,p_data,length);//Little-endian
                 p_us->test_char_val=testCharVal;
+                NRF_LOG_INFO("Write testchar value:%x\r\n",p_us->test_char_val);
             }
          }            
 
@@ -238,7 +239,7 @@ void us_gatts_handle_write(ble_us_t      * p_us,
     reply.params.write.p_data = p_data;
 
     err_code=send_write_reply(p_us, &reply);
-
+    //us_gatts_send_reply->sd_ble_gatts_rw_authorize_reply
 }
 
 static uint32_t get_evt_type_for_handle(uint16_t handle, uint16_t * p_uuid)
@@ -362,7 +363,7 @@ ret_code_t send_notification(ble_us_t * p_us)
     return err_code;
 }
 
-ret_code_t on_write(ble_us_t * p_us, ble_evt_t  * p_ble_evt)
+ret_code_t on_write(ble_us_t * p_us, ble_evt_t * p_ble_evt)  //const
 {
     uint32_t err_code = NRF_SUCCESS;
     uint16_t write_evt_uuid = 0;
@@ -375,19 +376,19 @@ ret_code_t on_write(ble_us_t * p_us, ble_evt_t  * p_ble_evt)
                                 p_evt_write->uuid.uuid,//write_evt_uuid,
                                 p_evt_write->handle,
                                 p_evt_write->data,
-                                p_evt_write->len);
+                                p_evt_write->len);//us_gatts_handle_write
     }
     if( (p_evt_write->handle==p_us->test_handle.cccd_handle)&&
         (p_evt_write->len==2) )
     {
         if(ble_srv_is_notification_enabled(p_evt_write->data))
         {
-            NRF_LOG_INFO("Enable test char notification. \r\n"); 
-            send_notification(p_us);
+            NRF_LOG_INFO("Enable test char notification."); 
+            send_notification(p_us);//sd_ble_gatts_hvx
         }
         else
         {
-            NRF_LOG_INFO("Disable test char notification. \r\n");
+            NRF_LOG_INFO("Disable test char notification.");
         }
     }
     return NRF_SUCCESS;
@@ -425,7 +426,7 @@ void us_gatts_handle_read(ble_us_t * p_us, uint16_t uuid, uint16_t val_handle)
         break;
     }
 }
-ret_code_t on_rw_authorize_req(ble_us_t * p_us, ble_evt_t * p_ble_evt)
+ret_code_t on_rw_authorize_req(ble_us_t * p_us, ble_evt_t * p_ble_evt)    //const
 {
     ret_code_t err_code;
     VERIFY_PARAM_NOT_NULL(p_us);
@@ -476,7 +477,7 @@ ret_code_t on_rw_authorize_req(ble_us_t * p_us, ble_evt_t * p_ble_evt)
     return NRF_SUCCESS;
 }
 
-void ble_us_on_ble_evt(ble_evt_t *p_ble_evt,void *p_context)
+void ble_us_on_ble_evt(ble_evt_t *p_ble_evt,void *p_context)  // const
 {
     ble_us_t *p_us = (ble_us_t *)p_context;
     if( (p_ble_evt== NULL)||(p_context==NULL) )

@@ -68,7 +68,7 @@ struct ble_us_s{
 };
 
 ret_code_t ble_us_init(ble_us_t *p_us,ble_us_init_t *p_us_init);//sdk_errors.h
-void ble_us_on_ble_evt(ble_evt_t *p_ble_evt,void *p_context);
+void ble_us_on_ble_evt(ble_evt_t *p_ble_evt,void *p_context);// const
 
 void us_gatts_handle_write(ble_us_t      * p_us,
                            uint16_t        uuid,
