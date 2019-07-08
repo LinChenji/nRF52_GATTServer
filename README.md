@@ -1,8 +1,8 @@
-**# nRF52_GATTServer
+# nRF52_GATTServer
 
 nRF52 BLE_Peripheral新建自定义服务流程：
 
-1、	路径ble_peripheral有模板例程ble_app_template，不妨以此做蓝本来建立自己的service
+1、	由于ble_peripheral有模板例程ble_app_template，不妨以此做蓝本来建立自己的service
 来处理一些自定义特征值。复制整个文件夹将其命名为ble_app_template(add new service)。
 
 ![建工程.jpg](过程截图/1建工程.png)
